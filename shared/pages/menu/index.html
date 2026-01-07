@@ -81,6 +81,31 @@
       </section>
     </main>
 
+    <!-- Modal: elección de tipo de consumo -->
+    <div id="checkoutModal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
+      <div id="checkoutModalOverlay" class="absolute inset-0 bg-black/40"></div>
+      <div class="relative min-h-full flex items-end sm:items-center justify-center p-4" style="padding-bottom: calc(16px + env(safe-area-inset-bottom));">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div class="p-5">
+            <div class="flex items-start justify-between gap-3">
+              <h2 id="checkoutModalTitle" class="text-lg font-extrabold text-gray-900">¿Cómo quieres consumir?</h2>
+              <button id="checkoutModalClose" type="button" class="text-sm text-gray-600 hover:text-gray-900">Cerrar</button>
+            </div>
+            <p class="mt-2 text-sm text-gray-600">Elige una opción para continuar.</p>
+
+            <div class="mt-5 grid grid-cols-1 gap-3">
+              <button id="onsiteBtn" type="button" class="w-full bg-white border border-gray-200 text-gray-900 px-4 py-3 rounded-xl font-semibold">
+                Consumo en el local
+              </button>
+              <button id="deliveryPickupBtn" type="button" class="w-full bg-brand-800 text-white px-4 py-3 rounded-xl font-semibold shadow">
+                Delivery o Pickup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Botón visible/flotante: aparece solo si hay items -->
     <div
       id="payBar"
@@ -417,7 +442,43 @@
       }
 
       document.getElementById('payBtn')?.addEventListener('click', () => {
-        // Por ahora enviamos al checkout de mod-1.
+        openCheckoutModal();
+      });
+
+      function openCheckoutModal() {
+        const modal = document.getElementById('checkoutModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        // Enfocar primer CTA
+        document.getElementById('deliveryPickupBtn')?.focus();
+      }
+
+      function closeCheckoutModal() {
+        const modal = document.getElementById('checkoutModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        document.getElementById('payBtn')?.focus();
+      }
+
+      document.getElementById('checkoutModalOverlay')?.addEventListener('click', closeCheckoutModal);
+      document.getElementById('checkoutModalClose')?.addEventListener('click', closeCheckoutModal);
+
+      document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        const modal = document.getElementById('checkoutModal');
+        if (modal && !modal.classList.contains('hidden')) closeCheckoutModal();
+      });
+
+      document.getElementById('onsiteBtn')?.addEventListener('click', () => {
+        // No checkout por ahora: se queda en el menú.
+        // Si más adelante existe flujo de consumo en local, redirige aquí.
+        localStorage.setItem('dp_service_type', 'onsite');
+        closeCheckoutModal();
+      });
+
+      document.getElementById('deliveryPickupBtn')?.addEventListener('click', () => {
+        localStorage.setItem('dp_service_type', 'delivery_or_pickup');
+        // Enviamos al checkout de mod-1.
         // Si mod-3 usa otro checkout, puedes decidir la ruta aquí por parámetro/flag.
         const checkoutUrl = new URL(
           '../../../mod-1-delivery-pickup/pages/checkout/index.html',
