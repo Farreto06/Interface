@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Menú — Charlotte</title>
+
+    <link rel="stylesheet" href="../../styles/global.css" />
+    <link rel="stylesheet" href="./page.css" />
+
+    <script>
+      // Tailwind CDN lee esta config al cargar.
+      // Nota: no usamos `tailwind.config = ...` aquí porque `tailwind` todavía no existe.
+      // Si en el futuro usas Vite: reemplaza la config runtime por `import.meta.env.VITE_BACKEND_URL`.
+      window.tailwind = {
+        config: {
+          theme: {
+            extend: {
+              colors: {
+                brand: {
+                  50: '#f2f7f1',
+                  700: '#13532a',
+                  800: '#0f4a22'
+                }
+              },
+              fontFamily: {
+                sans: ['Inter', 'ui-sans-serif', 'system-ui']
+              }
+            }
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+
+  <body class="bg-brand-50 min-h-screen text-gray-800 font-sans">
+    <!-- Header: CLONADO de checkout/order-tracking (debe mantenerse idéntico) -->
+    <header class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="w-4 h-4 bg-black rotate-45"></div>
+          <span class="font-semibold">Charlotte</span>
+        </div>
+
+        <nav class="flex-1 min-w-0">
+          <div class="min-w-0 flex flex-wrap items-center justify-end gap-3 sm:gap-6 text-sm text-gray-700">
+            <a href="#" class="shrink-0 hover:text-gray-900">Menú</a>
+            <a href="#" class="shrink-0 hover:text-gray-900">Ofertas</a>
+            <a href="#" class="shrink-0 hover:text-gray-900">Recompensas</a>
+            <button class="shrink-0 flex items-center gap-2 bg-white px-3 py-1 rounded-full shadow-sm" type="button">
+              Carrito <span id="cartBadge" class="text-xs bg-gray-200 rounded-full px-2">0</span>
+            </button>
+            <img
+              src="https://images.unsplash.com/photo-1545996124-1b0a7b8be1d1?q=80&w=40&auto=format&fit=crop&crop=faces"
+              alt="avatar"
+              class="shrink-0 w-9 h-9 rounded-full border"
+            />
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 py-6">
+      <!-- Browse-First: mostramos el catálogo primero, sin pedir ubicación/login -->
+      <section class="mb-8">
+        <h1 class="text-3xl md:text-4xl font-extrabold">Explora el menú</h1>
+        <p class="mt-2 text-sm text-gray-600">
+          Elige lo que se te antoje. La ubicación la pedimos en el checkout.
+        </p>
+      </section>
+
+      <section>
+        <div id="status" class="text-sm text-gray-600">Cargando menú…</div>
+
+        <div
+          id="grid"
+          class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+          aria-live="polite"
+        ></div>
+      </section>
+    </main>
+
+    <!-- Botón visible/flotante: aparece solo si hay items -->
+    <div
+      id="payBar"
+      class="fixed left-0 right-0 bottom-0 px-6 pb-6 pointer-events-none"
+      style="padding-bottom: calc(24px + env(safe-area-inset-bottom));"
+    >
+      <div class="max-w-6xl mx-auto">
+        <div id="bottomBar" class="pointer-events-auto hidden">
+          <div class="flex flex-col sm:flex-row sm:items-end sm:justify-end gap-3">
+            <button
+              id="cartBtn"
+              type="button"
+              class="w-full sm:w-auto bg-white text-gray-800 px-5 py-3 rounded-full font-semibold shadow-lg border border-gray-200"
+            >
+              Carrito
+            </button>
+            <button
+              id="payBtn"
+              type="button"
+              class="w-full sm:w-auto bg-brand-800 text-white px-5 py-3 rounded-full font-semibold shadow-lg"
+            >
+              Ir a Pagar
+            </button>
+          </div>
+
+          <div
+            id="cartPanel"
+            class="hidden mt-3 bg-white rounded-2xl border border-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.03)] overflow-hidden"
+          >
+            <div class="p-4 flex items-center justify-between gap-3">
+              <div class="font-bold text-gray-900">Tu carrito</div>
+              <button id="cartCloseBtn" type="button" class="text-sm text-gray-600 hover:text-gray-900">Cerrar</button>
+            </div>
+            <div id="cartItems" class="divide-y divide-gray-100"></div>
+            <div class="p-4 flex items-center justify-between gap-3">
+              <div class="text-sm text-gray-600">Total</div>
+              <div id="cartTotal" class="text-sm font-extrabold text-gray-900">$0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- Config BACKEND_URL (no se puede leer .env directo desde el navegador) ---
+      // Opciones recomendadas para inyectar:
+      // 1) Vite: import.meta.env.VITE_BACKEND_URL
+      // 2) Un archivo `config.js` que haga: window.__APP_CONFIG__ = { BACKEND_URL: '...' }
+      // 3) Como fallback local para prototipos: localStorage.setItem('BACKEND_URL', 'http://localhost:3000')
+      const BACKEND_URL =
+        (window.__APP_CONFIG__ && window.__APP_CONFIG__.BACKEND_URL) ||
+        localStorage.getItem('BACKEND_URL') ||
+        'http://localhost:3000';
+
+      const CART_KEY = 'dp_cart_v1';
+
+      function formatPrice(value) {
+        const num = Number(value);
+        if (Number.isFinite(num)) return '$' + num.toFixed(2);
+        return String(value);
+      }
+
+      function readCart() {
+        try {
+          const raw = localStorage.getItem(CART_KEY);
+          return raw ? JSON.parse(raw) : { items: [] };
+        } catch {
+          return { items: [] };
+        }
+      }
+
+      function writeCart(cart) {
+        localStorage.setItem(CART_KEY, JSON.stringify(cart));
+      }
+
+      function cartCount(cart) {
+        return (cart.items || []).reduce((acc, it) => acc + (it.qty || 0), 0);
+      }
+
+      function setCartUI() {
+        const cart = readCart();
+        const count = cartCount(cart);
+
+        const badge = document.getElementById('cartBadge');
+        if (badge) badge.textContent = String(count);
+
+        const bottomBar = document.getElementById('bottomBar');
+        const payBtn = document.getElementById('payBtn');
+        const cartBtn = document.getElementById('cartBtn');
+
+        if (bottomBar) {
+          if (count > 0) bottomBar.classList.remove('hidden');
+          else bottomBar.classList.add('hidden');
+        }
+
+        if (payBtn) payBtn.textContent = `Ir a Pagar (${count})`;
+        if (cartBtn) cartBtn.textContent = `Carrito (${count})`;
+
+        renderCartPanel();
+      }
+
+      function money(value) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+      }
+
+      function cartTotal(cart) {
+        return (cart.items || []).reduce((acc, it) => acc + money(it.price) * (it.qty || 0), 0);
+      }
+
+      function updateQty(productId, delta) {
+        const cart = readCart();
+        const items = cart.items || [];
+        const item = items.find(it => it.id === productId);
+        if (!item) return;
+
+        item.qty = (item.qty || 0) + delta;
+        cart.items = items.filter(it => (it.qty || 0) > 0);
+        writeCart(cart);
+        setCartUI();
+      }
+
+      function removeItem(productId) {
+        const cart = readCart();
+        cart.items = (cart.items || []).filter(it => it.id !== productId);
+        writeCart(cart);
+        setCartUI();
+      }
+
+      function renderCartPanel() {
+        const cart = readCart();
+        const itemsEl = document.getElementById('cartItems');
+        const totalEl = document.getElementById('cartTotal');
+        if (!itemsEl || !totalEl) return;
+
+        const items = cart.items || [];
+        totalEl.textContent = formatPrice(cartTotal(cart));
+
+        if (!items.length) {
+          itemsEl.innerHTML = '<div class="p-4 text-sm text-gray-600">Tu carrito está vacío.</div>';
+          return;
+        }
+
+        itemsEl.innerHTML = items
+          .map(
+            it => `
+              <div class="p-4 flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="font-semibold text-gray-900 truncate">${it.name}</div>
+                  <div class="text-sm text-gray-600 mt-0.5">${formatPrice(it.price)}</div>
+                  <button data-action="remove" data-id="${it.id}" type="button" class="mt-2 text-xs text-gray-500 hover:text-gray-900">Eliminar</button>
+                </div>
+                <div class="shrink-0 flex items-center gap-2">
+                  <button data-action="dec" data-id="${it.id}" type="button" class="w-10 h-10 rounded-full bg-gray-100 text-gray-800 font-bold">−</button>
+                  <div class="w-8 text-center font-semibold text-gray-900">${it.qty}</div>
+                  <button data-action="inc" data-id="${it.id}" type="button" class="w-10 h-10 rounded-full bg-brand-800 text-white font-bold">+</button>
+                </div>
+              </div>
+            `
+          )
+          .join('');
+      }
+
+      function addToCart(product) {
+        const cart = readCart();
+        const items = cart.items || [];
+
+        const existing = items.find(it => it.id === product.id);
+        if (existing) {
+          existing.qty += 1;
+        } else {
+          items.push({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            imageUrl: product.imageUrl,
+            qty: 1
+          });
+        }
+
+        cart.items = items;
+        writeCart(cart);
+        setCartUI();
+      }
+
+      function normalizeCatalog(json) {
+        // Intentamos soportar varias formas típicas de respuesta.
+        const items =
+          (json && Array.isArray(json.items) && json.items) ||
+          (json && Array.isArray(json.data) && json.data) ||
+          (Array.isArray(json) && json) ||
+          [];
+
+        return items
+          .map(p => ({
+            id: String(p.id ?? p.sku ?? p.code ?? ''),
+            name: p.name ?? p.title ?? 'Producto',
+            description: p.description ?? p.shortDescription ?? '',
+            price: p.price ?? p.unitPrice ?? 0,
+            imageUrl:
+              p.imageUrl ||
+              p.image ||
+              (Array.isArray(p.images) ? p.images[0] : '') ||
+              'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=800&auto=format&fit=crop',
+          }))
+          .filter(p => p.id);
+      }
+
+      function mockCatalog() {
+        return {
+          items: [
+            {
+              id: 'sw-pollo-picante',
+              name: 'Sándwich de Pollo Picante',
+              description: 'Crujiente, jugoso y con el picante justo.',
+              price: 8.99,
+              imageUrl:
+                'https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=800&auto=format&fit=crop'
+            },
+            {
+              id: 'papas-fritas',
+              name: 'Papas Fritas',
+              description: 'Doradas, calientes y perfectas para compartir.',
+              price: 2.99,
+              imageUrl:
+                'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?q=80&w=800&auto=format&fit=crop'
+            },
+            {
+              id: 'coca-cola',
+              name: 'Coca‑Cola',
+              description: 'Bien fría, como tiene que ser.',
+              price: 1.99,
+              imageUrl:
+                'https://images.unsplash.com/photo-1610873167013-2dd675d30ef4?q=80&w=800&auto=format&fit=crop'
+            },
+            {
+              id: 'ensalada-fresca',
+              name: 'Ensalada Fresca',
+              description: 'Ligera, crujiente y con aderezo de la casa.',
+              price: 5.49,
+              imageUrl:
+                'https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?q=80&w=800&auto=format&fit=crop'
+            },
+            {
+              id: 'combo-doble',
+              name: 'Combo Doble',
+              description: 'Más sabor, más antojo. Ideal para hambre seria.',
+              price: 12.49,
+              imageUrl:
+                'https://images.unsplash.com/photo-1550547660-ef8d1f3a7b6f?q=80&w=800&auto=format&fit=crop'
+            },
+            {
+              id: 'postre-choco',
+              name: 'Postre Chocolate',
+              description: 'Un final dulce que se siente premium.',
+              price: 3.99,
+              imageUrl:
+                'https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=800&auto=format&fit=crop'
+            }
+          ]
+        };
+      }
+
+      function renderProducts(products) {
+        const grid = document.getElementById('grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        products.forEach(product => {
+          const card = document.createElement('article');
+          card.className =
+            'bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-[0_1px_0_rgba(0,0,0,0.03)]';
+
+          card.innerHTML = `
+            <div class="aspect-[4/3] bg-gray-100 overflow-hidden">
+              <img src="${product.imageUrl}" alt="${product.name}" class="w-full h-full object-cover" loading="lazy" />
+            </div>
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-lg font-bold text-gray-900 leading-snug">${product.name}</h3>
+                <div class="shrink-0 text-sm font-extrabold text-gray-900">${formatPrice(product.price)}</div>
+              </div>
+              ${product.description ? `<p class="mt-2 text-sm text-gray-600">${product.description}</p>` : ''}
+              <div class="mt-4 flex items-center justify-between gap-3">
+                <button data-add="${product.id}" type="button" class="bg-brand-800 text-white px-4 py-2 rounded-full font-semibold shadow hover:bg-brand-700">
+                  Añadir
+                </button>
+                <span class="text-xs text-gray-500">Listo en minutos</span>
+              </div>
+            </div>
+          `;
+
+          grid.appendChild(card);
+        });
+
+        grid.addEventListener(
+          'click',
+          e => {
+            const btn = e.target.closest('button[data-add]');
+            if (!btn) return;
+            const id = btn.getAttribute('data-add');
+            const product = products.find(p => p.id === id);
+            if (product) addToCart(product);
+          },
+          { passive: true }
+        );
+      }
+
+      async function loadCatalog() {
+        const status = document.getElementById('status');
+
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/dp/v1/catalog`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' }
+          });
+
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const products = normalizeCatalog(json);
+
+          if (!products.length) throw new Error('Catálogo vacío o formato desconocido');
+
+          if (status) status.textContent = '';
+          renderProducts(products);
+        } catch (err) {
+          // Demo: si la API no está disponible, mostramos un catálogo simulado.
+          const products = normalizeCatalog(mockCatalog());
+          if (status)
+            status.textContent =
+              'Mostrando catálogo de ejemplo (API no disponible o sin CORS).';
+          renderProducts(products);
+        }
+      }
+
+      document.getElementById('payBtn')?.addEventListener('click', () => {
+        // Por ahora enviamos al checkout de mod-1.
+        // Si mod-3 usa otro checkout, puedes decidir la ruta aquí por parámetro/flag.
+        const checkoutUrl = new URL(
+          '../../../mod-1-delivery-pickup/pages/checkout/index.html',
+          window.location.href
+        );
+        window.location.href = checkoutUrl.toString();
+      });
+
+      function toggleCart(open) {
+        const panel = document.getElementById('cartPanel');
+        if (!panel) return;
+        if (open) panel.classList.remove('hidden');
+        else panel.classList.add('hidden');
+      }
+
+      document.getElementById('cartBtn')?.addEventListener('click', () => {
+        const panel = document.getElementById('cartPanel');
+        if (!panel) return;
+        const isOpen = !panel.classList.contains('hidden');
+        toggleCart(!isOpen);
+      });
+
+      document.getElementById('cartCloseBtn')?.addEventListener('click', () => toggleCart(false));
+
+      document.getElementById('cartPanel')?.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.getAttribute('data-action');
+        const id = btn.getAttribute('data-id');
+        if (!id) return;
+
+        if (action === 'inc') updateQty(id, 1);
+        else if (action === 'dec') updateQty(id, -1);
+        else if (action === 'remove') removeItem(id);
+      });
+
+      setCartUI();
+      loadCatalog();
+    </script>
+  </body>
+</html>
