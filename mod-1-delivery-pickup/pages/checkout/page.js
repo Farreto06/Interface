@@ -407,11 +407,19 @@ form.addEventListener('submit', function (e) {
     (async () => {
       try {
         const result = await createOrder();
-        const orderId = result && (result.order_id || result.id || result.orderId);
-        const nextUrl = new URL('../order-tracking/index.html', window.location.href);
-        nextUrl.searchParams.set('mode', mode);
-        if (orderId) nextUrl.searchParams.set('orderId', String(orderId));
-        window.location.href = nextUrl.toString();
+        const noteId = result && (result.note_id || result.noteId || result.order_id || result.id || result.orderId);
+        const readableId = result && (result.readable_id || result.readableId);
+        const trackingId = readableId || noteId;
+
+        if (trackingId) {
+          const nextUrl = new URL(`/order-tracking/${encodeURIComponent(String(trackingId))}`, window.location.href);
+          nextUrl.searchParams.set('mode', mode);
+          window.location.href = nextUrl.toString();
+        } else {
+          const nextUrl = new URL('/mod-1-delivery-pickup/pages/order-tracking/index.html', window.location.href);
+          nextUrl.searchParams.set('mode', mode);
+          window.location.href = nextUrl.toString();
+        }
       } catch (err) {
         setSubmitError(err && err.message ? err.message : 'No se pudo crear la orden.');
       } finally {

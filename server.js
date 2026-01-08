@@ -33,8 +33,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'mod-4-seguridad', 'Inicio sesión', 'Inicio-sesion.html'));
 });
 
-// Serve the workspace as static files
+// Serve the workspace as static files (must come BEFORE "pretty" routes)
 app.use(express.static(__dirname));
+
+// Rutas "lindas" para order tracking
+app.get('/order-tracking/:id', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'mod-1-delivery-pickup', 'pages', 'order-tracking', 'index.html'));
+});
 
 function startServer(port, remainingAttempts) {
   const server = app.listen(port, () => {
