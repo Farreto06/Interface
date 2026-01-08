@@ -577,19 +577,6 @@
 
           grid.appendChild(card);
         });
-
-        grid.addEventListener(
-          'click',
-          e => {
-            const btn = e.target.closest('button[data-add]');
-            if (!btn) return;
-            if (btn.hasAttribute('disabled')) return;
-            const id = btn.getAttribute('data-add');
-            const product = products.find(p => p.id === id);
-            if (product) addToCart(product);
-          },
-          { passive: true }
-        );
       }
 
       async function loadKitchenCategories() {
@@ -744,6 +731,21 @@
         else if (action === 'dec') updateQty(id, -1);
         else if (action === 'remove') removeItem(id);
       });
+
+      // Click handler único para "Añadir" (evita duplicados al re-render por categorías)
+      document.getElementById('grid')?.addEventListener(
+        'click',
+        e => {
+          const btn = e.target.closest('button[data-add]');
+          if (!btn) return;
+          if (btn.hasAttribute('disabled')) return;
+          const id = btn.getAttribute('data-add');
+          if (!id) return;
+          const product = (state.products || []).find(p => p.id === id);
+          if (product) addToCart(product);
+        },
+        { passive: true }
+      );
 
       document.getElementById('categories')?.addEventListener('click', e => {
         const btn = e.target.closest('button[data-cat]');
