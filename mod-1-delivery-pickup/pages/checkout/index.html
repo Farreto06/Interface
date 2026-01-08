@@ -61,7 +61,7 @@
 
           <div>
             <label class="block text-sm font-medium mb-2">Teléfono</label>
-            <input id="phone" name="phone" required placeholder="Ingresa tu teléfono" class="w-full rounded-md border border-gray-300 p-3 bg-white placeholder-gray-400 shadow-[0_1px_0_rgba(0,0,0,0.03)]" />
+            <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="Ingresa tu teléfono" pattern="^[0-9+()\-\s]+$" class="w-full rounded-md border border-gray-300 p-3 bg-white placeholder-gray-400 shadow-[0_1px_0_rgba(0,0,0,0.03)]" />
             <p id="err-phone" class="mt-1 text-xs text-red-600 hidden">Por favor ingresa tu teléfono.</p>
           </div>
 

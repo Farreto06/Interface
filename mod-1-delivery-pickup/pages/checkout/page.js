@@ -9,6 +9,43 @@ const zoneInput = document.getElementById('zone');
 const zoneChipsWrap = document.getElementById('zoneChips');
 let zoneChips = Array.from(document.querySelectorAll('.zone-chip'));
 
+// Teléfono: permitir solo caracteres típicos de números telefónicos
+const phoneInput = document.getElementById('phone');
+
+function sanitizePhone(value) {
+  return String(value ?? '').replace(/[^0-9+()\-\s]/g, '');
+}
+
+if (phoneInput) {
+  phoneInput.addEventListener('input', () => {
+    const cleaned = sanitizePhone(phoneInput.value);
+    if (cleaned !== phoneInput.value) phoneInput.value = cleaned;
+  });
+
+  phoneInput.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const allowedKeys = new Set([
+      'Backspace',
+      'Delete',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'Home',
+      'End',
+      'Tab',
+      'Enter'
+    ]);
+    if (allowedKeys.has(e.key)) return;
+
+    // Permite dígitos y símbolos comunes de teléfono
+    if (/^[0-9+()\-\s]$/.test(e.key)) return;
+
+    e.preventDefault();
+  });
+}
+
 function normalizeBaseUrl(url) {
   const raw = String(url ?? '').trim();
   if (!raw) return '';
